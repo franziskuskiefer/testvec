@@ -40,6 +40,7 @@ pub struct AEADTestVector {
 }
 
 impl AEADTestVector {
+    // FIXME: use str
     pub fn new(file: String) -> Result<Self, String> {
         let file = match File::open(file) {
             Ok(f) => f,
