@@ -39,32 +39,31 @@ fn test_ring_aead(
     (in_out, c)
 }
 
-fn test_aead(tests: &AEADTestVector, algorithm: &'static Algorithm) {
+fn test_aead(tests: &AEADTestVector) {
     let mut num_tests = tests.numberOfTests;
     let mut skipped_tests = false;
+    let mut algorithm = match tests.algorithm.as_ref() {
+        "AES-GCM" => &aead::AES_128_GCM,
+        "CHACHA20-POLY1305" => &aead::CHACHA20_POLY1305,
+        _ => panic!("No algorithm set!"),
+    };
     for testGroup in tests.testGroups.iter() {
         assert_eq!(testGroup.r#type, "AeadTest");
-        // TODO: not cool
-        let mut algorithm = algorithm;
-        if algorithm == &aead::AES_128_GCM && testGroup.ivSize != 96 {
-            // not implemented
-            println!("Nonce sizes != 96 are not supported for AES GCM");
-            skipped_tests = true;
-            continue;
+        if tests.algorithm == "AES-GCM" {
+            if testGroup.keySize == 256 {
+                algorithm = &aead::AES_256_GCM;
+            }
+            if testGroup.ivSize != 96 {
+                // not implemented
+                println!("Nonce sizes != 96 are not supported for AES GCM");
+                skipped_tests = true;
+                continue;
+            } else if testGroup.keySize == 192 {
+                println!("AES is not implemented for keySize 192");
+                skipped_tests = true;
+                continue;
+            }
         }
-        if algorithm == &aead::AES_128_GCM && testGroup.keySize == 192 {
-            // not implemented
-            println!("AES 192 is not implemented");
-            skipped_tests = true;
-            continue;
-        }
-        if algorithm != &aead::CHACHA20_POLY1305 && testGroup.keySize == 256 {
-            algorithm = &aead::AES_256_GCM
-        }
-        // if algorithm == &aead::AES_128_GCM && testGroup.keySize == 256 {
-        //     println!("foooooooooooooooooo");
-        //     algorithm = &aead::AES_256_GCM;
-        // }
         for test in testGroup.tests.iter() {
             let valid = test.result.eq("valid");
             if test.comment == "invalid nonce size" {
@@ -105,16 +104,14 @@ macro_rules! test_aead_gen {
             assert!(p.is_ok());
             let p = p.unwrap();
 
-            // println!("test cases:\n{:?}", p);
             let notes = p.get_notes();
-            // println!("notes:\n{:?}", notes);
             assert!(notes.len() == $test_case.1);
-            $test_func(&p, $alg);
+            $test_func(&p);
         }
     };
 }
 
-fn noop(tests: &AEADTestVector, algorithm: &'static Algorithm) {}
+fn noop(_tests: &AEADTestVector) {}
 
 test_aead_gen!(
     chacha,
